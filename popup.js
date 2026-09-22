@@ -87,7 +87,39 @@ function refreshButton(){
 $('#q').addEventListener('input', paint);
 $('#selAll').addEventListener('click', () => { visible().forEach(t => picked.add(t.id)); paint(); });
 $('#selNone').addEventListener('click', () => { visible().forEach(t => picked.delete(t.id)); paint(); });
-$('#gear').addEventListener('click', () => { $('#settings').hidden = !$('#settings').hidden; });
+$('#gear').addEventListener('click', () => {
+  $('#settings').hidden = !$('#settings').hidden;
+  if(!$('#settings').hidden) paintBackup();
+});
+
+/* Копия, которую присылает страница. Держим её здесь, но толку от неё нет,
+   если её нельзя забрать — поэтому рядом кнопка «Скачать». */
+async function paintBackup(){
+  const list = (await chrome.storage.local.get('backups')).backups || [];
+  const last = list[list.length - 1];
+  const txt = $('#bakTxt');
+  if(!last){
+    txt.textContent = 'Запасная копия: пока нет — откройте ZAKLADKA';
+    $('#bakGet').hidden = true;
+    return;
+  }
+  const d = new Date(last.at);
+  const when = d.toLocaleDateString('ru-RU', { day:'numeric', month:'long' }) + ', ' +
+               d.toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit' });
+  txt.textContent = 'Копия от ' + when + ' — ссылок: ' + (last.links || 0) +
+                    (list.length > 1 ? ' (хранится ' + list.length + ')' : '');
+  $('#bakGet').hidden = false;
+}
+$('#bakGet').addEventListener('click', async () => {
+  const list = (await chrome.storage.local.get('backups')).backups || [];
+  const last = list[list.length - 1];
+  if(!last) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([last.json], { type:'application/json' }));
+  a.download = 'zakladka-' + new Date(last.at).toISOString().slice(0,10) + '.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+});
 $('#appUrl').addEventListener('change', async e => {
   const v = e.target.value.trim();
   if(v) await chrome.storage.local.set({ appUrl: v });
