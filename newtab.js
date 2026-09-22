@@ -1,9 +1,9 @@
-/* Новая вкладка. По умолчанию сразу уходим в Картотеку: встроить её во фрейм
+/* Новая вкладка. По умолчанию сразу уходим в ZAKLADKA: встроить её во фрейм
    нельзя — claude.ai отдаёт x-frame-options: SAMEORIGIN. Если автопереход
    выключен, показываем локальную страницу с теми же действиями. */
 (async () => {
   const { appUrl, newtabRedirect } = await chrome.storage.local.get(['appUrl', 'newtabRedirect']);
-  const url = appUrl || DEFAULT_APP;
+  const url = appOr(appUrl);
 
   if(newtabRedirect !== false){ location.replace(url); return; }
 

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Картотека — сдать вкладки",
-  "version": "1.1.0",
-  "description": "Сдаёт открытые вкладки в Картотеку: копирует их названия и адреса, закрывает вкладки и освобождает память Chrome.",
+  "name": "ZAKLADKA — сдать вкладки",
+  "version": "1.2.0",
+  "description": "Сдаёт открытые вкладки в ZAKLADKA: копирует их названия и адреса, закрывает вкладки и освобождает память Chrome.",
   "permissions": [
     "tabs",
     "storage",
@@ -10,7 +10,7 @@
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Сдать вкладки в Картотеку",
+    "default_title": "Сдать вкладки в ZAKLADKA",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png"
@@ -50,6 +50,7 @@
   "content_scripts": [
     {
       "matches": [
+        "https://vzavalko.github.io/zakladka/*",
         "https://vzavalko.github.io/kartoteka/*"
       ],
       "js": [

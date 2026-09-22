@@ -1,5 +1,5 @@
 /* Список вкладок текущего окна + очередь, сданная горячей клавишей.
-   Всё уезжает в буфер обмена строками «Заголовок | адрес» — Картотека
+   Всё уезжает в буфер обмена строками «Заголовок | адрес» — ZAKLADKA
    разбирает такой формат при вставке. */
 const $ = s => document.querySelector(s);
 let tabs = [], queue = [], picked = new Set(), settings = null;
@@ -120,7 +120,7 @@ $('#go').addEventListener('click', async () => {
 
   $('#main').hidden = true; $('#done').hidden = false;
 
-  /* Сначала открываем Картотеку, потом закрываем сданные вкладки —
+  /* Сначала открываем ZAKLADKA, потом закрываем сданные вкладки —
      иначе закрытие последней вкладки утянет за собой окно. */
   const open = await chrome.tabs.query({ currentWindow: true });
   const already = open.find(t => t.url && t.url.startsWith(url));
@@ -136,7 +136,7 @@ $('#go').addEventListener('click', async () => {
   /* На своём домене страница слышит расширение — тогда ⌘V не нужен вовсе. */
   const pushed = await pushTo(appTab.id, payload);
   if(pushed){
-    $('#done').innerHTML = '<div class="big">Сохранено в Картотеке</div><div class="sub">' +
+    $('#done').innerHTML = '<div class="big">Сохранено в ZAKLADKA</div><div class="sub">' +
       payload.length + ' ' + plural(payload.length,'ссылка','ссылки','ссылок') + ' уже на месте.</div>';
   }
   setTimeout(() => window.close(), pushed ? 1100 : 900);
@@ -145,7 +145,7 @@ $('#go').addEventListener('click', async () => {
 boot();
 
 /* ───────── адрес без открытой вкладки ─────────
-   Заголовок берём из сети силами расширения: страница Картотеки так не умеет,
+   Заголовок берём из сети силами расширения: страница ZAKLADKA так не умеет,
    на ней запрет на любые внешние запросы. */
 const rawIn = $('#rawUrl'), rawGo = $('#rawGo'), rawNote = $('#rawNote');
 
@@ -197,7 +197,7 @@ rawGo.addEventListener('click', async () => {
     await navigator.clipboard.writeText(linesFor(done));
   }catch(e){ note('Не удалось записать в буфер.'); return; }
 
-  note('Готово: <b>' + named + ' из ' + list.length + '</b> с названием. Открываю Картотеку — нажмите ⌘V.');
+  note('Готово: <b>' + named + ' из ' + list.length + '</b> с названием. Открываю ZAKLADKA — нажмите ⌘V.');
   const url = ($('#appUrl').value.trim() || DEFAULT_APP);
   const open = await chrome.tabs.query({ currentWindow: true });
   const already = open.find(t => t.url === url);
@@ -220,7 +220,7 @@ async function pushTo(tabId, items){
 }
 
 /* Разрешение на сайты — явной галочкой, а не только при нажатии «Узнать»:
-   без него страница Картотеки не сможет спросить название у расширения. */
+   без него страница ZAKLADKA не сможет спросить название у расширения. */
 (async () => {
   const box = $('#netAccess');
   const has = await chrome.permissions.contains({ origins: ['<all_urls>'] });
@@ -229,7 +229,7 @@ async function pushTo(tabId, items){
     if(e.target.checked){
       const ok = await chrome.permissions.request({ origins: ['<all_urls>'] });
       e.target.checked = ok;
-      if(ok) note('Теперь названия узнаются и при вставке прямо в Картотеке.');
+      if(ok) note('Теперь названия узнаются и при вставке прямо в ZAKLADKA.');
     }else{
       await chrome.permissions.remove({ origins: ['<all_urls>'] });
       note('Доступ отозван — названия будут собираться из адреса.');
