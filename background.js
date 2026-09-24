@@ -13,26 +13,43 @@ async function appTabs(){
 
 const INBOX_MAX = 300;
 
-async function deliver(items, folder){
+async function deliver(items, folder, newFolder){
   const list = (items || []).filter(x => x && x.url);
   if(!list.length) return { ok:false };
+  let out = null;
   for(const t of await appTabs()){
     try{
-      const r = await chrome.tabs.sendMessage(t.id, { type:'push', items:list, folder });
-      if(r && r.ok) return { ok:true, live:true };
+      const r = await chrome.tabs.sendMessage(t.id, { type:'push', items:list, folder, newFolder });
+      if(r && r.ok){ out = { ok:true, live:true }; break; }
     }catch(e){}
   }
-  const inbox = (await chrome.storage.local.get('inbox')).inbox || [];
-  for(const it of list) inbox.push({ title: it.title || '', url: it.url, folder });
-  while(inbox.length > INBOX_MAX) inbox.shift();
-  await chrome.storage.local.set({ inbox });
-  await paintBadge(inbox.length);
-  return { ok:true, live:false };
+  if(!out){
+    const inbox = (await chrome.storage.local.get('inbox')).inbox || [];
+    for(const it of list) inbox.push({ title: it.title || '', url: it.url, folder, newFolder });
+    while(inbox.length > INBOX_MAX) inbox.shift();
+    await chrome.storage.local.set({ inbox });
+    await paintBadge(inbox.length);
+    out = { ok:true, live:false };
+  }
+  await noteSaved(list, folder);
+  return out;
+}
+
+/* Дописываем сохранённое в свой снимок, не дожидаясь нового от страницы:
+   иначе точка на значке появится через полминуты, а попап ещё раз предложит
+   сохранить то, что только что сохранили. */
+async function noteSaved(list, folder){
+  const snap = (await chrome.storage.local.get('snap')).snap;
+  if(!snap || !snap.urls) return;
+  const where = (folder === undefined || folder === '@at') ? (snap.active || '')
+              : (folder === '@new' ? '' : folder);
+  for(const it of list) snap.urls[normUrl(it.url)] = where;
+  await chrome.storage.local.set({ snap });
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   if(!msg || msg.type !== 'save') return;
-  deliver(msg.items, msg.folder).then(reply, () => reply({ ok:false }));
+  deliver(msg.items, msg.folder, msg.newFolder).then(reply, () => reply({ ok:false }));
   return true;
 });
 
@@ -54,7 +71,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   if(!msg || msg.type !== 'snapshot') return;
   chrome.storage.local.set({
     snap: { at: Date.now(), folders: msg.folders || [], active: msg.at || null, urls: msg.urls || {} }
-  }).then(() => reply({ ok:true }), () => reply({ ok:false }));
+  }).then(() => { markActive(); reply({ ok:true }); }, () => reply({ ok:false }));
   return true;
 });
 
@@ -70,6 +87,41 @@ chrome.commands.onCommand.addListener(async cmd => {
   /* последнюю вкладку окна не закрываем — иначе закроется само окно */
   const inWindow = await chrome.tabs.query({ currentWindow: true });
   if(inWindow.length > 1) chrome.tabs.remove(tab.id);
+  else markTab(tab.id, tab.url);
+});
+
+/* ── точка на значке ──
+   Вкладка, которая уже лежит в картотеке, помечается точкой — чтобы не
+   открывать попап ради проверки. Метка у каждой вкладки своя (`tabId`), общий
+   текст значка под ней не виден, поэтому счётчик ожидающих ссылок важнее:
+   пока он есть, точки не ставим. */
+const DOT = '\u2022';
+
+async function markTab(tabId, url){
+  if(!Number.isInteger(tabId)) return;
+  const store = await chrome.storage.local.get(['inbox', 'snap']);
+  if((store.inbox || []).length) return;             /* счётчик важнее точки */
+  const urls = (store.snap && store.snap.urls) || null;
+  const known = !!urls && savable(url) &&
+                Object.prototype.hasOwnProperty.call(urls, normUrl(url));
+  try{
+    await chrome.action.setBadgeText({ tabId, text: known ? DOT : '' });
+    if(known) await chrome.action.setBadgeBackgroundColor({ tabId, color: '#9A9AA0' });
+  }catch(e){}   /* вкладка могла закрыться, пока мы ходили в хранилище */
+}
+
+/* Активные вкладки всех окон: снимок поменялся — метки могли устареть. */
+async function markActive(){
+  let list = [];
+  try{ list = await chrome.tabs.query({ active: true }); }catch(e){ return; }
+  for(const t of list) await markTab(t.id, t.url);
+}
+
+chrome.tabs.onActivated.addListener(async ({ tabId }) => {
+  try{ const t = await chrome.tabs.get(tabId); markTab(tabId, t.url); }catch(e){}
+});
+chrome.tabs.onUpdated.addListener((tabId, info, t) => {
+  if(info.url || info.status === 'complete') markTab(tabId, t.url);
 });
 
 let flashTimer = null;

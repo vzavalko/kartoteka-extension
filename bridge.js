@@ -42,7 +42,7 @@ window.addEventListener('message', async e => {
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   if(!msg) return;
   if(msg.type === 'push' && Array.isArray(msg.items)){
-    post('push', { items: msg.items, folder: msg.folder });
+    post('push', { items: msg.items, folder: msg.folder, newFolder: msg.newFolder });
     reply({ ok: true });
     return false;
   }
@@ -64,9 +64,12 @@ chrome.runtime.sendMessage({ type:'inbox' }).then(r => {
   if(!items.length) return;
   const byFolder = new Map();
   for(const it of items){
-    const k = it.folder === undefined ? '@at' : String(it.folder);
+    const k = (it.folder === undefined ? '@at' : String(it.folder)) + '\u0000' + (it.newFolder || '');
     if(!byFolder.has(k)) byFolder.set(k, []);
     byFolder.get(k).push({ title: it.title || '', url: it.url });
   }
-  for(const [k, list] of byFolder) post('push', { items: list, folder: k === 'null' ? null : k });
+  for(const [k, list] of byFolder){
+    const [folder, newFolder] = k.split('\u0000');
+    post('push', { items: list, folder: folder === 'null' ? null : folder, newFolder });
+  }
 }).catch(() => {});
