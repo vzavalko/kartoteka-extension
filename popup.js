@@ -1,6 +1,6 @@
 /* Окно у значка расширения: сохранить текущую вкладку. Про папки попап знает только со слов самой страницы: она шлёт
    снимок через мост, расширение держит его в chrome.storage. Снимка нет —
-   остаются «Активная папка», «Без папки» и «+ Новая папка…». */
+   остаются «Активная папка» и «+ Новая папка…». */
 const $ = s => document.querySelector(s);
 let tab = null, snap = null;
 
@@ -55,8 +55,9 @@ function paintFolders(){
     o.value = value; o.textContent = label;
     sel.appendChild(o);
   };
-  add('@at', active ? 'Активная папка — ' + active.name : 'Активная папка');
-  add('', 'Без папки');
+  /* Имя активной папки — без приписки: и так видно, куда ляжет ссылка.
+     Общее «Активная папка» остаётся, только пока имени мы не знаем. */
+  add('@at', active ? active.name : 'Активная папка');
   for(const f of folders){
     if(f.id === (snap && snap.active)) continue;      /* она уже первой строкой */
     add(f.id, '  '.repeat(f.depth) + (f.depth ? '└ ' : '') + f.name);
