@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "ZAKLADKA",
-  "version": "1.6.1",
+  "version": "1.7.0",
   "description": "Сохраняет текущую вкладку в любую папку ZAKLADKA, показывает открытые вкладки на самой странице и узнаёт настоящие названия страниц.",
   "permissions": [
     "tabs",
@@ -55,6 +55,7 @@
       "js": [
         "bridge.js"
       ],
+      "all_frames": true,
       "run_at": "document_idle"
     }
   ]

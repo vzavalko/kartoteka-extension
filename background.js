@@ -5,10 +5,19 @@ importScripts('common.js', 'resolve.js');
    пользуются и кнопка в попапе, и горячая клавиша. Если страница открыта —
    отдаём ей напрямую, она сама разберётся с повторами и названием. Если нет —
    кладём в почтовый ящик, мост заберёт его при следующем открытии. */
+/* Страница живёт и в обычной вкладке, и во фрейме новой вкладки. У второй
+   адрес chrome://newtab — шаблоном url его не найти, поэтому фильтруем сами.
+   Новая вкладка без фрейма (автопереход выключен) просто не ответит. */
+const NEWTAB = /^chrome:\/\/newtab\b|^chrome-extension:\/\/[^/]+\/newtab\.html/;
 async function appTabs(){
   const { appUrl } = await getSettings();
-  const pats = [appUrl].concat(OLD_APPS).map(u => String(u).replace(/\/?$/, '/') + '*');
-  try{ return await chrome.tabs.query({ url: pats }); }catch(e){ return []; }
+  const roots = [appUrl].concat(OLD_APPS).map(u => String(u).replace(/\/?$/, '/'));
+  let all = [];
+  try{ all = await chrome.tabs.query({}); }catch(e){ return []; }
+  return all.filter(t => {
+    const u = t.url || t.pendingUrl || '';
+    return NEWTAB.test(u) || roots.some(r => u.startsWith(r));
+  });
 }
 
 const INBOX_MAX = 300;
@@ -195,9 +204,7 @@ let blinkTimer = null;
 function tabsChanged(){
   clearTimeout(blinkTimer);
   blinkTimer = setTimeout(async () => {
-    let pages = [];
-    try{ pages = await chrome.tabs.query({ url: ['https://vzavalko.github.io/zakladka/*', 'https://vzavalko.github.io/kartoteka/*'] }); }
-    catch(e){ return; }
+    const pages = await appTabs();
     for(const p of pages){
       const list = (await tabsOf(p.windowId)).filter(t => t.id !== p.id);
       chrome.tabs.sendMessage(p.id, { type:'tablist', items: list }).catch(() => {});
