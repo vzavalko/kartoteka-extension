@@ -21,9 +21,7 @@ async function getSettings(){
     newtabRedirect: s.newtabRedirect !== false
   };
 }
-async function getQueue(){ return (await chrome.storage.local.get('queue')).queue || []; }
-async function setQueue(q){ await chrome.storage.local.set({ queue: q }); await paintBadge(q.length); }
-
+/* Значок показывает, сколько ссылок ждёт закрытую страницу. */
 async function paintBadge(n){
   try{
     await chrome.action.setBadgeText({ text: n ? String(n) : '' });
@@ -34,3 +32,13 @@ async function paintBadge(n){
 /* Формат, который ZAKLADKA понимает при вставке: «Заголовок | адрес». */
 const lineFor = t => (t.title && t.title.trim() ? t.title.trim().replace(/\s+/g,' ') + ' | ' : '') + t.url;
 const linesFor = list => list.map(lineFor).join('\n');
+
+/* Один и тот же адрес пишут по-разному. Сравниваем так же, как страница, —
+   иначе попап и ZAKLADKA разойдутся в том, что считать повтором. */
+function normUrl(u){
+  try{
+    const x = new URL(u);
+    return x.hostname.replace(/^www\./i,'').toLowerCase() +
+           x.pathname.replace(/\/+$/,'').toLowerCase() + (x.search || '');
+  }catch(e){ return String(u || '').trim().toLowerCase(); }
+}

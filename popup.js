@@ -1,95 +1,125 @@
-/* Список вкладок текущего окна + очередь, сданная горячей клавишей.
-   Всё уезжает в буфер обмена строками «Заголовок | адрес» — ZAKLADKA
-   разбирает такой формат при вставке. */
+/* Окно у значка расширения: одна кнопка «Сохранить вкладку» и выбор папки.
+   Про папки попап знает только со слов самой страницы — она присылает снимок
+   через мост, расширение держит его в chrome.storage. Если страница ни разу не
+   открывалась, снимка нет: остаются «Активная папка» и «Без папки». */
 const $ = s => document.querySelector(s);
-let tabs = [], queue = [], picked = new Set(), settings = null;
+let tab = null, snap = null;
 
-const plural = (n,a,b,c) => { const m = n % 100, k = n % 10;
-  return (m > 10 && m < 20) ? c : k === 1 ? a : (k >= 2 && k <= 4) ? b : c; };
-const hostOf = u => { try{ return new URL(u).hostname.replace(/^www\./,''); }catch(e){ return u; } };
+const hostOf = u => { try{ return new URL(u).hostname.replace(/^www\./,''); }catch(e){ return u || ''; } };
+
+function letterTile(url){
+  const h = hostOf(url).split('.');
+  return (h.length > 1 ? h[h.length - 2] : h[0] || '?')[0] || '?';
+}
 
 async function boot(){
-  settings = await getSettings();
-  queue = await getQueue();
+  const settings = await getSettings();
   $('#appUrl').value = settings.appUrl;
-  $('#closeAfter').checked = settings.closeAfter;
   $('#newtabRedirect').checked = settings.newtabRedirect;
 
-  const all = await chrome.tabs.query({ currentWindow: true });
-  const appHost = (() => { try{ return new URL(settings.appUrl).href; }catch(e){ return ''; } })();
-  tabs = all.filter(t => savable(t.url) && t.url !== appHost);
-  picked = new Set(tabs.filter(t => !t.pinned).map(t => t.id));
+  [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  snap = (await chrome.storage.local.get('snap')).snap || null;
 
-  $('#count').textContent = tabs.length + ' ' + plural(tabs.length,'вкладка','вкладки','вкладок');
-  paint();
+  paintTab();
+  paintFolders();
+  paintState();
 }
 
-function visible(){
-  const q = $('#q').value.trim().toLowerCase();
-  if(!q) return tabs;
-  return tabs.filter(t => (t.title || '').toLowerCase().includes(q) || (t.url || '').toLowerCase().includes(q));
-}
-
-function paint(){
-  const list = $('#list'), rows = visible();
-  list.innerHTML = '';
-  for(const t of rows){
-    const li = document.createElement('li');
-    li.dataset.id = t.id;
-
-    const cb = document.createElement('input');
-    cb.type = 'checkbox'; cb.checked = picked.has(t.id);
-    li.appendChild(cb);
-
-    if(t.favIconUrl && /^https?:|^data:/.test(t.favIconUrl)){
-      const img = document.createElement('img');
-      img.className = 'fav'; img.src = t.favIconUrl; img.alt = '';
-      img.onerror = () => { img.replaceWith(letterTile(t.url)); };
-      li.appendChild(img);
-    } else li.appendChild(letterTile(t.url));
-
-    const txt = document.createElement('div');
-    txt.className = 'txt';
-    const a = document.createElement('div'); a.className = 't'; a.textContent = t.title || hostOf(t.url);
-    const b = document.createElement('div'); b.className = 'h'; b.textContent = hostOf(t.url);
-    txt.append(a, b);
-    li.appendChild(txt);
-    if(t.pinned){ const p = document.createElement('span'); p.className = 'pin'; p.textContent = 'закреплена'; li.appendChild(p); }
-
-    li.addEventListener('click', e => {
-      if(e.target !== cb) cb.checked = !cb.checked;
-      cb.checked ? picked.add(t.id) : picked.delete(t.id);
-      refreshButton();
-    });
-    list.appendChild(li);
+function paintTab(){
+  const ok = tab && savable(tab.url);
+  $('#title').textContent = ok ? (tab.title || hostOf(tab.url)) : 'Эту страницу сохранять нечего';
+  $('#host').textContent = ok ? hostOf(tab.url) : (tab ? (tab.url || '').split('/')[0] : '');
+  const fav = $('#fav');
+  fav.textContent = ok ? letterTile(tab.url) : '?';   /* запасной вариант готовим заранее */
+  if(ok && tab.favIconUrl && /^https?:|^data:/.test(tab.favIconUrl)){
+    const img = document.createElement('img');
+    img.className = 'fav'; img.src = tab.favIconUrl; img.alt = '';
+    img.onerror = () => { img.replaceWith(fav); };
+    fav.replaceWith(img);
   }
-  $('#none').hidden = tabs.length > 0;
-  $('#queueBox').hidden = queue.length === 0;
-  $('#qn').textContent = queue.length;
-  refreshButton();
-}
-function letterTile(url){
-  const s = document.createElement('span');
-  s.className = 'fav letter';
-  const h = hostOf(url).split('.');
-  s.textContent = (h.length > 1 ? h[h.length-2] : h[0] || '?')[0] || '?';
-  return s;
-}
-function refreshButton(){
-  const n = picked.size + queue.length;
-  $('#go').disabled = n === 0;
-  $('#go').textContent = n ? 'Сдать ' + n + ' ' + plural(n,'ссылку','ссылки','ссылок') : 'Сдать';
-  $('#hint').textContent = queue.length && picked.size
-    ? 'Уедут и выбранные вкладки, и очередь.'
-    : (picked.size ? 'Вкладки закроются, ссылки лягут в буфер.' : '');
 }
 
-$('#q').addEventListener('input', paint);
-$('#selAll').addEventListener('click', () => { visible().forEach(t => picked.add(t.id)); paint(); });
-$('#selNone').addEventListener('click', () => { visible().forEach(t => picked.delete(t.id)); paint(); });
+/* Плоский список с отступами: у <option> нет вложенности, поэтому глубину
+   рисуем пробелами — так же, как в самой ZAKLADKA. */
+function paintFolders(){
+  const sel = $('#folder'), folders = (snap && snap.folders) || [];
+  const active = folders.find(f => f.id === (snap && snap.active));
+  sel.innerHTML = '';
+
+  const add = (value, label) => {
+    const o = document.createElement('option');
+    o.value = value; o.textContent = label;
+    sel.appendChild(o);
+  };
+  add('@at', active ? 'Активная папка — ' + active.name : 'Активная папка');
+  add('', 'Без папки');
+  for(const f of folders){
+    if(f.id === (snap && snap.active)) continue;      /* она уже первой строкой */
+    add(f.id, '  '.repeat(f.depth) + (f.depth ? '└ ' : '') + f.name);
+  }
+  sel.value = '@at';
+}
+
+/* Повтор ловим здесь же: иначе страница спросила бы про него в фоновой
+   вкладке, и человек наткнулся бы на вопрос много позже и без контекста. */
+function dupFolder(){
+  if(!tab || !snap || !snap.urls) return undefined;
+  const key = normUrl(tab.url);
+  return Object.prototype.hasOwnProperty.call(snap.urls, key) ? snap.urls[key] : undefined;
+}
+
+function paintState(){
+  const ok = tab && savable(tab.url);
+  const go = $('#go'), note = $('#note');
+  go.disabled = !ok;
+  if(!ok){
+    note.hidden = false;
+    note.textContent = 'Служебные страницы Chrome вне браузера ничего не значат.';
+    return;
+  }
+  const dup = dupFolder();
+  if(dup === undefined){
+    go.textContent = 'Сохранить вкладку';
+    note.hidden = !!snap;
+    if(!snap) note.innerHTML = 'Папки покажу, как только ZAKLADKA откроется хоть раз.';
+    return;
+  }
+  const f = ((snap && snap.folders) || []).find(x => x.id === dup);
+  go.textContent = 'Сохранить ещё раз';
+  note.hidden = false;
+  note.innerHTML = 'Такая ссылка уже есть' + (f ? ' — в «<b>' + f.name + '</b>»' : ' в ZAKLADKA') + '.';
+}
+
+$('#go').addEventListener('click', async () => {
+  if(!tab || !savable(tab.url)) return;
+  const go = $('#go');
+  go.disabled = true;
+  const folder = $('#folder').value;
+  const r = await chrome.runtime.sendMessage({
+    type: 'save',
+    items: [{ title: tab.title || '', url: tab.url }],
+    folder
+  });
+  if(!r || !r.ok){
+    go.disabled = false;
+    $('#note').hidden = false;
+    $('#note').textContent = 'Не получилось сохранить — попробуйте ещё раз.';
+    return;
+  }
+  go.classList.add('ok');
+  go.textContent = r.live ? 'Сохранено' : 'Сохраню при открытии';
+  $('#note').hidden = false;
+  $('#note').textContent = r.live
+    ? 'Ссылка уже в ZAKLADKA.'
+    : 'ZAKLADKA сейчас закрыта — ссылка ляжет в папку, как только откроется.';
+  setTimeout(() => window.close(), 900);
+});
+
 $('#gear').addEventListener('click', () => {
-  $('#settings').hidden = !$('#settings').hidden;
-  if(!$('#settings').hidden) paintBackup();
+  const box = $('#settings'), show = box.hidden;
+  box.hidden = !show;
+  $('#gear').setAttribute('aria-expanded', String(show));
+  if(show) paintBackup();
 });
 
 /* Копия, которую присылает страница. Держим её здесь, но толку от неё нет,
@@ -120,151 +150,24 @@ $('#bakGet').addEventListener('click', async () => {
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 });
+
 $('#appUrl').addEventListener('change', async e => {
   const v = e.target.value.trim();
   if(v) await chrome.storage.local.set({ appUrl: v });
 });
-$('#closeAfter').addEventListener('change', async e => {
-  await chrome.storage.local.set({ closeAfter: e.target.checked });
-});
 $('#newtabRedirect').addEventListener('change', async e => {
   await chrome.storage.local.set({ newtabRedirect: e.target.checked });
 });
-$('#qClear').addEventListener('click', async () => { queue = []; await setQueue(queue); paint(); });
 
-$('#go').addEventListener('click', async () => {
-  const chosen = tabs.filter(t => picked.has(t.id));
-  const payload = queue.concat(chosen.map(t => ({ title: t.title || '', url: t.url })));
-  if(!payload.length) return;
-
-  /* Буфер пишем первым делом: если сорвётся, вкладки останутся целы. */
-  try{
-    await navigator.clipboard.writeText(linesFor(payload));
-  }catch(e){
-    $('#done').hidden = false; $('#main').hidden = true;
-    $('#done').innerHTML = '<div class="big">Не удалось скопировать</div><div class="sub">Chrome не дал доступ к буферу обмена. Вкладки не тронуты.</div>';
-    return;
-  }
-
-  queue = []; await setQueue(queue);
-  const url = ($('#appUrl').value.trim() || DEFAULT_APP);
-  await chrome.storage.local.set({ appUrl: url });
-
-  $('#main').hidden = true; $('#done').hidden = false;
-
-  /* Сначала открываем ZAKLADKA, потом закрываем сданные вкладки —
-     иначе закрытие последней вкладки утянет за собой окно. */
-  const open = await chrome.tabs.query({ currentWindow: true });
-  const already = open.find(t => t.url && t.url.startsWith(url));
-  let appTab;
-  if(already){ appTab = already; await chrome.tabs.update(already.id, { active: true }); }
-  else appTab = await chrome.tabs.create({ url, active: true });
-
-  if($('#closeAfter').checked && chosen.length){
-    const ids = chosen.filter(t => !t.pinned).map(t => t.id);
-    if(ids.length) await chrome.tabs.remove(ids);
-  }
-
-  /* На своём домене страница слышит расширение — тогда ⌘V не нужен вовсе. */
-  const pushed = await pushTo(appTab.id, payload);
-  if(pushed){
-    $('#done').innerHTML = '<div class="big">Сохранено в ZAKLADKA</div><div class="sub">' +
-      payload.length + ' ' + plural(payload.length,'ссылка','ссылки','ссылок') + ' уже на месте.</div>';
-  }
-  setTimeout(() => window.close(), pushed ? 1100 : 900);
-});
-
-boot();
-
-/* ───────── адрес без открытой вкладки ─────────
-   Заголовок берём из сети силами расширения: страница ZAKLADKA так не умеет,
-   на ней запрет на любые внешние запросы. */
-const rawIn = $('#rawUrl'), rawGo = $('#rawGo'), rawNote = $('#rawNote');
-
-function urlsIn(text){
-  const out = [];
-  for(const part of String(text || '').split(/[\s,]+/)){
-    const t = part.trim(); if(!t) continue;
-    try{
-      const u = new URL(/^[a-z][a-z0-9+.-]*:/i.test(t) ? t : 'https://' + t);
-      if(/^https?:$/.test(u.protocol) && !out.includes(u.href)) out.push(u.href);
-    }catch(e){}
-  }
-  return out;
-}
-
-/* Если в буфере уже лежит адрес — подставим, чтобы не вставлять руками. */
-(async () => {
-  try{
-    const text = await navigator.clipboard.readText();
-    const list = urlsIn(text);
-    if(list.length && !list.some(u => u.startsWith('http') && text.includes(' | '))){
-      rawIn.value = list.join(' ');
-      rawIn.placeholder = '';
-      note(list.length === 1 ? 'Адрес взят из буфера.' : 'Из буфера: ' + list.length + ' ' + plural(list.length,'адрес','адреса','адресов') + '.');
-    }
-  }catch(e){ /* без разрешения или пустой буфер — просто оставим поле пустым */ }
-})();
-
-function note(html){ rawNote.hidden = false; rawNote.innerHTML = html; }
-
-rawGo.addEventListener('click', async () => {
-  const list = urlsIn(rawIn.value);
-  if(!list.length){ note('Не вижу адреса.'); rawIn.focus(); return; }
-
-  const granted = await chrome.permissions.request({ origins: ['<all_urls>'] });
-  if(!granted){ note('Без доступа к сайтам название не узнать — можно добавить и без него.'); return; }
-
-  rawGo.disabled = true;
-  const done = [];
-  for(let i = 0; i < list.length; i++){
-    note('Узнаю названия… <b>' + (i + 1) + ' из ' + list.length + '</b>');
-    const title = await resolveTitle(list[i]);
-    done.push({ title, url: list[i] });
-  }
-  rawGo.disabled = false;
-
-  const named = done.filter(d => d.title).length;
-  try{
-    await navigator.clipboard.writeText(linesFor(done));
-  }catch(e){ note('Не удалось записать в буфер.'); return; }
-
-  note('Готово: <b>' + named + ' из ' + list.length + '</b> с названием. Открываю ZAKLADKA — нажмите ⌘V.');
-  const url = ($('#appUrl').value.trim() || DEFAULT_APP);
-  const open = await chrome.tabs.query({ currentWindow: true });
-  const already = open.find(t => t.url === url);
-  if(already) await chrome.tabs.update(already.id, { active: true });
-  else await chrome.tabs.create({ url, active: true });
-  setTimeout(() => window.close(), 1200);
-});
-rawIn.addEventListener('keydown', e => { if(e.key === 'Enter') rawGo.click(); });
-
-/* Страница отвечает не сразу после открытия — даём мосту подняться. */
-async function pushTo(tabId, items){
-  for(let i = 0; i < 6; i++){
-    try{
-      const r = await chrome.tabs.sendMessage(tabId, { type:'push', items });
-      if(r && r.ok) return true;
-    }catch(e){}
-    await new Promise(r => setTimeout(r, 350));
-  }
-  return false;
-}
-
-/* Разрешение на сайты — явной галочкой, а не только при нажатии «Узнать»:
-   без него страница ZAKLADKA не сможет спросить название у расширения. */
+/* Разрешение на сайты — явной галочкой: без него ZAKLADKA не сможет спросить
+   у расширения настоящее название страницы. */
 (async () => {
   const box = $('#netAccess');
-  const has = await chrome.permissions.contains({ origins: ['<all_urls>'] });
-  box.checked = has;
+  box.checked = await chrome.permissions.contains({ origins: ['<all_urls>'] });
   box.addEventListener('change', async e => {
-    if(e.target.checked){
-      const ok = await chrome.permissions.request({ origins: ['<all_urls>'] });
-      e.target.checked = ok;
-      if(ok) note('Теперь названия узнаются и при вставке прямо в ZAKLADKA.');
-    }else{
-      await chrome.permissions.remove({ origins: ['<all_urls>'] });
-      note('Доступ отозван — названия будут собираться из адреса.');
-    }
+    if(e.target.checked) e.target.checked = await chrome.permissions.request({ origins: ['<all_urls>'] });
+    else await chrome.permissions.remove({ origins: ['<all_urls>'] });
   });
 })();
+
+boot();

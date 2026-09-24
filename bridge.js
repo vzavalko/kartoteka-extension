@@ -19,9 +19,16 @@ const ASKS = {
                                                                         (r, id) => ['backup-done', { id, saved:!!(r && r.saved), at:r && r.at }]]
 };
 
+/* Письма без ответа: страница просто рассказывает о себе. */
+const TELLS = {
+  snapshot: m => ({ type:'snapshot', folders:m.folders || [], at:m.at || null, urls:m.urls || {} })
+};
+
 window.addEventListener('message', async e => {
   if(e.source !== window || !e.data) return;
   const kind = e.data[MARK] || e.data[MARK_OLD];
+  const tell = TELLS[kind];
+  if(tell){ chrome.runtime.sendMessage(tell(e.data)).catch(() => {}); return; }
   const spec = ASKS[kind];
   if(!spec) return;
   const [ask, answer] = spec;
@@ -35,7 +42,7 @@ window.addEventListener('message', async e => {
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   if(!msg) return;
   if(msg.type === 'push' && Array.isArray(msg.items)){
-    post('push', { items: msg.items });
+    post('push', { items: msg.items, folder: msg.folder });
     reply({ ok: true });
     return false;
   }
@@ -48,3 +55,18 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
 
 /* Здороваемся, чтобы страница знала: название можно спросить у расширения. */
 post('hello', { version: chrome.runtime.getManifest().version });
+
+/* Пока страница была закрыта, вкладки могли сохранять из попапа — они ждали
+   в расширении. Забираем и раскладываем: одно письмо на папку, чтобы страница
+   показала одно уведомление, а не десять. */
+chrome.runtime.sendMessage({ type:'inbox' }).then(r => {
+  const items = (r && r.items) || [];
+  if(!items.length) return;
+  const byFolder = new Map();
+  for(const it of items){
+    const k = it.folder === undefined ? '@at' : String(it.folder);
+    if(!byFolder.has(k)) byFolder.set(k, []);
+    byFolder.get(k).push({ title: it.title || '', url: it.url });
+  }
+  for(const [k, list] of byFolder) post('push', { items: list, folder: k === 'null' ? null : k });
+}).catch(() => {});

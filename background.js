@@ -1,22 +1,91 @@
 importScripts('common.js', 'resolve.js');
 
-/* Горячая клавиша: текущая вкладка уходит в очередь и закрывается.
-   Буфер обмена из фонового скрипта недоступен — нет документа, — поэтому
-   копчение происходит позже, в попапе, разом по всей очереди. */
+/* ── сохранение одной вкладки ──
+   Единственный путь, которым ссылка попадает в ZAKLADKA из расширения: им
+   пользуются и кнопка в попапе, и горячая клавиша. Если страница открыта —
+   отдаём ей напрямую, она сама разберётся с повторами и названием. Если нет —
+   кладём в почтовый ящик, мост заберёт его при следующем открытии. */
+async function appTabs(){
+  const { appUrl } = await getSettings();
+  const pats = [appUrl].concat(OLD_APPS).map(u => String(u).replace(/\/?$/, '/') + '*');
+  try{ return await chrome.tabs.query({ url: pats }); }catch(e){ return []; }
+}
+
+const INBOX_MAX = 300;
+
+async function deliver(items, folder){
+  const list = (items || []).filter(x => x && x.url);
+  if(!list.length) return { ok:false };
+  for(const t of await appTabs()){
+    try{
+      const r = await chrome.tabs.sendMessage(t.id, { type:'push', items:list, folder });
+      if(r && r.ok) return { ok:true, live:true };
+    }catch(e){}
+  }
+  const inbox = (await chrome.storage.local.get('inbox')).inbox || [];
+  for(const it of list) inbox.push({ title: it.title || '', url: it.url, folder });
+  while(inbox.length > INBOX_MAX) inbox.shift();
+  await chrome.storage.local.set({ inbox });
+  await paintBadge(inbox.length);
+  return { ok:true, live:false };
+}
+
+chrome.runtime.onMessage.addListener((msg, sender, reply) => {
+  if(!msg || msg.type !== 'save') return;
+  deliver(msg.items, msg.folder).then(reply, () => reply({ ok:false }));
+  return true;
+});
+
+/* Мост спрашивает при каждом открытии страницы: что накопилось, пока её не было. */
+chrome.runtime.onMessage.addListener((msg, sender, reply) => {
+  if(!msg || msg.type !== 'inbox') return;
+  (async () => {
+    const inbox = (await chrome.storage.local.get('inbox')).inbox || [];
+    if(inbox.length){ await chrome.storage.local.set({ inbox: [] }); await paintBadge(0); }
+    reply({ items: inbox });
+  })();
+  return true;
+});
+
+/* ── снимок страницы ──
+   Папки и адреса живут в localStorage страницы, попапу туда хода нет. Страница
+   присылает выжимку сама — после каждой правки. */
+chrome.runtime.onMessage.addListener((msg, sender, reply) => {
+  if(!msg || msg.type !== 'snapshot') return;
+  chrome.storage.local.set({
+    snap: { at: Date.now(), folders: msg.folders || [], active: msg.at || null, urls: msg.urls || {} }
+  }).then(() => reply({ ok:true }), () => reply({ ok:false }));
+  return true;
+});
+
+/* Горячая клавиша: текущая вкладка уезжает в ту папку, куда складывают сейчас,
+   и закрывается. Значок коротко показывает галочку — попапа-то нет. */
 chrome.commands.onCommand.addListener(async cmd => {
   if(cmd !== 'stash-current') return;
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if(!tab || !savable(tab.url)) return;
-  const queue = await getQueue();
-  if(!queue.some(q => q.url === tab.url)) queue.push({ title: tab.title || '', url: tab.url });
-  await setQueue(queue);
+  const r = await deliver([{ title: tab.title || '', url: tab.url }], '@at');
+  if(!r.ok) return;
+  if(r.live) flashBadge();
   /* последнюю вкладку окна не закрываем — иначе закроется само окно */
   const inWindow = await chrome.tabs.query({ currentWindow: true });
   if(inWindow.length > 1) chrome.tabs.remove(tab.id);
 });
 
-chrome.runtime.onStartup.addListener(async () => paintBadge((await getQueue()).length));
-chrome.runtime.onInstalled.addListener(async () => paintBadge((await getQueue()).length));
+let flashTimer = null;
+function flashBadge(){
+  clearTimeout(flashTimer);
+  chrome.action.setBadgeText({ text: '\u2713' }).catch(() => {});
+  chrome.action.setBadgeBackgroundColor({ color: '#FA0CF7' }).catch(() => {});
+  flashTimer = setTimeout(async () => {
+    const inbox = (await chrome.storage.local.get('inbox')).inbox || [];
+    paintBadge(inbox.length);
+  }, 1400);
+}
+
+const waiting = async () => ((await chrome.storage.local.get('inbox')).inbox || []).length;
+chrome.runtime.onStartup.addListener(async () => paintBadge(await waiting()));
+chrome.runtime.onInstalled.addListener(async () => paintBadge(await waiting()));
 
 /* Страница просит узнать названия. Сама она не может: чужой сайт ей читать
    не дадут (CORS), а расширению с выданным разрешением — можно. */

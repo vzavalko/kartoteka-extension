@@ -14,153 +14,133 @@
   color-scheme:dark;
 }}
 *{box-sizing:border-box}
-/* .box{display:flex} и #settings перебивали бы штатный [hidden] */
+/* .box{display:flex} перебивал бы штатный [hidden] */
 [hidden]{display:none!important}
 body{
-  margin:0;width:392px;background:var(--paper);color:var(--ink);
+  margin:0;width:326px;padding-bottom:14px;background:var(--paper);color:var(--ink);
   font:13px/1.45 system-ui,-apple-system,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;
 }
 button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
-header{display:flex;align-items:center;gap:9px;padding:12px 14px 10px}
+
+header{display:flex;align-items:center;gap:9px;padding:13px 14px 11px}
 .mark{width:26px;height:26px;border-radius:8px;background:var(--accent);display:grid;place-items:center;flex:none}
 .mark svg{width:15px;height:15px;color:#fff}
 header b{font-size:14px;letter-spacing:-.01em}
-.count{margin-left:auto;font-size:11.5px;color:var(--muted)}
-.icobtn{width:26px;height:26px;border-radius:999px;display:grid;place-items:center;color:var(--muted)}
-.icobtn:hover{background:var(--surf)}
+.icobtn{
+  margin-left:auto;width:28px;height:28px;border-radius:999px;display:grid;place-items:center;
+  color:var(--muted);transition:background .16s,color .16s,transform .3s cubic-bezier(.32,.72,0,1);
+}
+.icobtn:hover{background:var(--surf);color:var(--ink)}
+.icobtn[aria-expanded="true"]{background:var(--surf-2);color:var(--ink);transform:rotate(60deg)}
 .icobtn svg{width:15px;height:15px}
 
-.pad{padding:0 14px}
-.box{
-  display:flex;align-items:center;gap:9px;margin:0 14px 10px;padding:9px 11px;
-  border:1px solid var(--line);border-radius:11px;background:var(--surf);font-size:12px;
+/* ── что сохраняем ── */
+.tab{
+  display:flex;align-items:center;gap:9px;margin:0 14px 11px;padding:9px 11px;
+  border:1px solid var(--line);border-radius:11px;background:var(--surf);min-width:0;
 }
-.box b{font-variant-numeric:tabular-nums}
-.box button{margin-left:auto;font-size:11.5px;color:var(--muted);padding:3px 8px;border-radius:999px}
-.box button:hover{background:var(--surf-2);color:var(--ink)}
-#settings input{
-  width:100%;margin-top:5px;background:var(--paper);border:1px solid var(--line);
-  border-radius:8px;padding:6px 8px;font:11.5px/1.4 ui-monospace,Menlo,monospace;color:inherit;
-}
-#settings label{display:block;font-size:11px;color:var(--muted)}
-#settings .check{display:flex;align-items:center;gap:7px;margin-top:9px;font-size:11.5px;cursor:pointer}
-#settings .check input{accent-color:var(--accent);margin:0;cursor:pointer;width:14px;height:14px}
-
-.tools{display:flex;align-items:center;gap:7px;padding:0 14px 9px}
-#q{
-  flex:1;min-width:0;background:var(--surf);border:1px solid transparent;border-radius:999px;
-  padding:7px 12px;font:inherit;color:inherit;
-}
-#q:focus{outline:none;border-color:var(--accent);background:var(--paper)}
-.tools button{font-size:11.5px;color:var(--muted);padding:5px 9px;border-radius:999px;white-space:nowrap}
-.mini{
-  flex:none;background:var(--accent);color:#fff;border-radius:999px;padding:0 13px;height:31px;
-  font-size:12px;font-weight:600;
-}
-.mini:disabled{opacity:.45;cursor:default}
-.mini:not(:disabled):hover{filter:brightness(1.1)}
-.rawnote{margin-top:7px;font-size:11.5px;color:var(--muted);line-height:1.45}
-.rawnote b{color:var(--ink);font-weight:600}
-.tools button:hover{background:var(--surf);color:var(--ink)}
-
-ul{list-style:none;margin:0;padding:0 8px;max-height:330px;overflow-y:auto}
-li{display:flex;align-items:center;gap:9px;padding:7px 6px;border-radius:9px;cursor:pointer}
-li:hover{background:var(--surf)}
-li input{accent-color:var(--accent);width:15px;height:15px;flex:none;margin:0;cursor:pointer}
-.fav{width:17px;height:17px;flex:none;border-radius:4px;object-fit:contain}
+.fav{width:18px;height:18px;flex:none;border-radius:4px;object-fit:contain}
 .fav.letter{
   display:grid;place-items:center;background:var(--line-2);color:var(--paper);
   font:600 9px/1 system-ui;text-transform:uppercase;
 }
-.txt{min-width:0;flex:1}
+.tab .txt{min-width:0;flex:1}
 .t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12.5px}
 .h{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:10.5px ui-monospace,Menlo,monospace;color:var(--muted);margin-top:1px}
-.pin{font-size:10px;color:var(--muted);flex:none}
-.none{padding:22px 14px;text-align:center;color:var(--muted);font-size:12.5px}
 
-footer{display:flex;align-items:center;gap:10px;padding:10px 14px 12px;border-top:1px solid var(--line);margin-top:8px}
-footer label{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted);cursor:pointer}
-footer label input{accent-color:var(--accent);margin:0;cursor:pointer}
+/* ── кнопка ── */
 .primary{
-  margin-left:auto;background:var(--accent);color:#fff;border-radius:999px;
-  padding:9px 15px;font-size:12.5px;font-weight:600;white-space:nowrap;
+  display:block;width:calc(100% - 28px);margin:0 14px;background:var(--accent);color:#fff;
+  border-radius:12px;padding:12px;font-size:13.5px;font-weight:600;
+  transition:filter .16s,transform .14s cubic-bezier(.32,.72,0,1),background .2s;
 }
+.primary:not(:disabled):hover{filter:brightness(1.08)}
+.primary:not(:disabled):active{transform:scale(.975)}
 .primary:disabled{opacity:.4;cursor:default}
-.primary:not(:disabled):hover{filter:brightness(1.1)}
-#done{padding:26px 16px;text-align:center}
-#done .big{font-size:15px;font-weight:600;margin-bottom:5px}
-#done .sub{font-size:12.5px;color:var(--muted)}
+.primary.ok{background:var(--ink);color:var(--paper)}
+
+/* ── выбор папки ── */
+.where{display:flex;align-items:center;gap:9px;margin:11px 14px 0}
+.where > span{font-size:12px;color:var(--muted);flex:none}
+.sel{position:relative;flex:1;min-width:0}
+.sel select{
+  appearance:none;-webkit-appearance:none;width:100%;
+  background:var(--surf);border:1px solid var(--line);border-radius:10px;
+  padding:9px 30px 9px 11px;font:inherit;color:inherit;cursor:pointer;
+  text-overflow:ellipsis;transition:background .16s,border-color .16s;
+}
+.sel select:hover{background:var(--surf-2)}
+.sel select:focus{outline:none;border-color:var(--accent);background:var(--paper)}
+.sel svg{
+  position:absolute;right:11px;top:50%;margin-top:-3px;width:9px;height:6px;
+  color:var(--muted);pointer-events:none;
+}
+
+.note{padding:9px 15px 0;font-size:11.5px;color:var(--muted);line-height:1.45}
+.note b{color:var(--ink);font-weight:600}
+.pad-b{padding-bottom:14px}
+
+/* ── настройки ── */
+.box{
+  display:flex;align-items:center;gap:9px;margin:12px 14px 0;padding:10px 11px;
+  border:1px solid var(--line);border-radius:11px;background:var(--surf);font-size:12px;
+}
+#settings input[type=text]{
+  width:100%;margin-top:5px;background:var(--paper);border:1px solid var(--line);
+  border-radius:8px;padding:6px 8px;font:11.5px/1.4 ui-monospace,Menlo,monospace;color:inherit;
+}
+#settings label{display:block;font-size:11px;color:var(--muted)}
+#settings .check{display:flex;align-items:center;gap:7px;margin-top:9px;font-size:11.5px;color:var(--ink);cursor:pointer}
+#settings .check input{accent-color:var(--accent);margin:0;cursor:pointer;width:14px;height:14px;flex:none}
+#settings .box button{height:22px;padding:0 8px;font-size:11px;border-radius:999px;color:var(--muted)}
+#settings .box button:hover{background:var(--surf-2);color:var(--ink)}
 kbd{
   font:11px ui-monospace,Menlo,monospace;background:var(--surf-2);border:1px solid var(--line);
   border-radius:5px;padding:1px 5px;
 }
-.hint{padding:0 14px 10px;font-size:11px;color:var(--muted);line-height:1.5}
 </style>
 
-<div id="main">
-  <header>
-    <span class="mark"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M1.9 12.6V3.4h4.2l1.4 1.9h6.6v7.3a.8.8 0 0 1-.8.8H2.7a.8.8 0 0 1-.8-.8Z"/></svg></span>
-    <b>ZAKLADKA</b>
-    <span class="count" id="count"></span>
-    <button class="icobtn" id="gear" title="Настройки" aria-label="Настройки">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.6v1.7M8 12.7v1.7M14.4 8h-1.7M3.3 8H1.6M12.5 3.5l-1.2 1.2M4.7 11.3l-1.2 1.2M12.5 12.5l-1.2-1.2M4.7 4.7 3.5 3.5"/></svg>
-    </button>
-  </header>
+<header>
+  <span class="mark"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M1.9 12.6V3.4h4.2l1.4 1.9h6.6v7.3a.8.8 0 0 1-.8.8H2.7a.8.8 0 0 1-.8-.8Z"/></svg></span>
+  <b>ZAKLADKA</b>
+  <button class="icobtn" id="gear" title="Настройки" aria-label="Настройки" aria-expanded="false">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.6v1.7M8 12.7v1.7M14.4 8h-1.7M3.3 8H1.6M12.5 3.5l-1.2 1.2M4.7 11.3l-1.2 1.2M12.5 12.5l-1.2-1.2M4.7 4.7 3.5 3.5"/></svg>
+  </button>
+</header>
 
-  <div class="box" id="settings" hidden>
-    <div style="flex:1">
+<div class="tab" id="tab">
+  <span class="fav letter" id="fav">?</span>
+  <div class="txt"><div class="t" id="title">…</div><div class="h" id="host"></div></div>
+</div>
+
+<button class="primary" id="go" disabled>Сохранить вкладку</button>
+
+<label class="where">
+  <span>в папку</span>
+  <span class="sel">
+    <select id="folder"><option value="@at">Активная папка</option></select>
+    <svg viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M1 1.2 5 5 9 1.2"/></svg>
+  </span>
+</label>
+
+<div class="note pad-b" id="note" hidden></div>
+
+<div id="settings" hidden>
+  <div class="box">
+    <div style="flex:1;min-width:0">
       <label>Адрес ZAKLADKA
-        <input id="appUrl" spellcheck="false" placeholder="https://...">
+        <input type="text" id="appUrl" spellcheck="false" placeholder="https://...">
       </label>
       <label class="check"><input type="checkbox" id="newtabRedirect"> новая вкладка открывает ZAKLADKA</label>
       <label class="check"><input type="checkbox" id="netAccess"> узнавать названия по адресу (доступ к сайтам)</label>
-      <div id="bak" style="margin-top:9px;font-size:11px;color:var(--muted);display:flex;align-items:center;gap:7px">
+      <div id="bak" style="margin-top:10px;font-size:11px;color:var(--muted);display:flex;align-items:center;gap:7px">
         <span id="bakTxt" style="flex:1">Запасная копия: нет</span>
-        <button id="bakGet" hidden style="height:22px;padding:0 8px;font-size:11px">Скачать</button>
+        <button id="bakGet" hidden>Скачать</button>
       </div>
     </div>
   </div>
-
-  <div class="box" id="queueBox" hidden>
-    <span>В очереди <b id="qn">0</b> — сданы по <kbd>⌘⇧S</kbd></span>
-    <button id="qClear">Очистить</button>
-  </div>
-
-  <div class="box" id="pasteBox">
-    <div style="flex:1;min-width:0">
-      <label style="display:block;font-size:11px;color:var(--muted);margin-bottom:5px">
-        Адрес без открытой вкладки — узнаю настоящее название
-      </label>
-      <div style="display:flex;gap:7px">
-        <input id="rawUrl" placeholder="https://…" spellcheck="false"
-               style="flex:1;min-width:0;background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font:12px/1.4 ui-monospace,Menlo,monospace;color:inherit">
-        <button id="rawGo" class="mini">Узнать</button>
-      </div>
-      <div id="rawNote" class="rawnote" hidden></div>
-    </div>
-  </div>
-
-  <div class="tools">
-    <input id="q" placeholder="Фильтр по названию или адресу" autocomplete="off" spellcheck="false">
-    <button id="selAll">Все</button>
-    <button id="selNone">Никакие</button>
-  </div>
-
-  <ul id="list"></ul>
-  <div class="none" id="none" hidden>Нечего сдавать — в этом окне только служебные страницы.</div>
-
-  <footer>
-    <label><input type="checkbox" id="closeAfter" checked> закрывать вкладки</label>
-    <button class="primary" id="go" disabled>Сдать</button>
-  </footer>
-  <div class="hint" id="hint"></div>
-</div>
-
-<div id="done" hidden>
-  <div class="big">Скопировано</div>
-  <div class="sub">Открываю ZAKLADKA — нажмите <kbd>⌘V</kbd></div>
+  <div class="note pad-b"><kbd>⌘⇧S</kbd> — сохранить вкладку и закрыть её, <kbd>⌘⇧K</kbd> — открыть это окно.</div>
 </div>
 
 <script src="common.js"></script>
-<script src="resolve.js"></script>
 <script src="popup.js"></script>
