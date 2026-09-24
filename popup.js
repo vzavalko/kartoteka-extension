@@ -1,13 +1,10 @@
-/* Окно у значка расширения: сохранить текущую вкладку — и, если надо, разом
-   всё окно. Про папки попап знает только со слов самой страницы: она шлёт
+/* Окно у значка расширения: сохранить текущую вкладку. Про папки попап знает только со слов самой страницы: она шлёт
    снимок через мост, расширение держит его в chrome.storage. Снимка нет —
    остаются «Активная папка», «Без папки» и «+ Новая папка…». */
 const $ = s => document.querySelector(s);
-let tab = null, snap = null, rest = [];
+let tab = null, snap = null;
 
 const hostOf = u => { try{ return new URL(u).hostname.replace(/^www\./,''); }catch(e){ return u || ''; } };
-const plural = (n,a,b,c) => { const m = n % 100, k = n % 10;
-  return (m > 10 && m < 20) ? c : k === 1 ? a : (k >= 2 && k <= 4) ? b : c; };
 
 function letterTile(url){
   const h = hostOf(url).split('.');
@@ -21,13 +18,8 @@ async function boot(){
   $('#newtabRedirect').checked = settings.newtabRedirect;
   $('#closeAfter').checked = settings.closeAfter;
 
-  const all = await chrome.tabs.query({ currentWindow: true });
-  tab = all.find(t => t.active) || null;
+  [tab = null] = await chrome.tabs.query({ active: true, currentWindow: true });
   snap = (await chrome.storage.local.get('snap')).snap || null;
-
-  /* Всё окно — без закреплённых и без самой ZAKLADKA: её сохранять незачем. */
-  const app = settings.appUrl;
-  rest = all.filter(t => savable(t.url) && !t.pinned && !String(t.url).startsWith(app));
 
   paintTab();
   paintFolders();
@@ -84,10 +76,6 @@ function dupFolder(){
 function paintState(){
   const on = ok(), go = $('#go'), note = $('#note');
   go.disabled = !on;
-  $('#all').disabled = !rest.length;
-  $('#all').innerHTML = rest.length
-    ? 'Забрать все вкладки окна — <b>' + rest.length + '</b>'
-    : 'В этом окне больше нечего забирать';
 
   if(!on){
     note.hidden = false;
@@ -134,13 +122,13 @@ async function save(items, folder, newFolder){
   const r = await chrome.runtime.sendMessage({ type:'save', items, folder, newFolder });
   return r && r.ok ? r : null;
 }
-function done(btn, live, extra){
+function done(btn, live){
   btn.classList.add('ok');
   btn.textContent = live ? 'Сохранено' : 'Сохраню при открытии';
   $('#note').hidden = false;
   $('#note').textContent = live
-    ? (extra || 'Ссылка уже в ZAKLADKA.')
-    : 'ZAKLADKA сейчас закрыта — ссылки лягут в папку, как только откроется.';
+    ? 'Ссылка уже в ZAKLADKA.'
+    : 'ZAKLADKA сейчас закрыта — ссылка ляжет в папку, как только откроется.';
 }
 /* Последнюю вкладку окна не закрываем — вместе с ней закроется само окно. */
 async function closeTabs(ids){
@@ -169,29 +157,6 @@ $('#go').addEventListener('click', async e => {
      не сразу: вместе с вкладкой пропадёт и это окошко вместе с ответом. */
   const shut = e.altKey ? !$('#closeAfter').checked : $('#closeAfter').checked;
   setTimeout(async () => { if(shut) await closeTabs([tab.id]); window.close(); }, 700);
-});
-
-/* ── всё окно разом ── */
-const dateName = () => 'Вкладки, ' +
-  new Date().toLocaleDateString('ru-RU', { day:'numeric', month:'long' });
-
-$('#all').addEventListener('click', async e => {
-  if(!rest.length) return;
-  const btn = $('#all');
-  btn.disabled = true;
-  const name = dateName();
-  const r = await save(rest.map(t => ({ title: t.title || '', url: t.url })), '@new', name);
-  if(!r){
-    btn.disabled = false;
-    $('#note').hidden = false;
-    $('#note').textContent = 'Не получилось сохранить — попробуйте ещё раз.';
-    return;
-  }
-  btn.innerHTML = r.live
-    ? 'Забрал <b>' + rest.length + '</b> ' + plural(rest.length,'вкладку','вкладки','вкладок') + ' → «' + name + '»'
-    : 'Заберу при открытии ZAKLADKA';
-  const shut = e.altKey ? !$('#closeAfter').checked : $('#closeAfter').checked;
-  setTimeout(async () => { if(shut) await closeTabs(rest.map(t => t.id)); window.close(); }, 900);
 });
 
 $('#gear').addEventListener('click', () => {

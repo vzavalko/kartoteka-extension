@@ -15,19 +15,35 @@ def rounded(x, y, w, h, r):
         return dx * dx + dy * dy <= r * r + 1e-9
     return inside
 
-def render(size):
-    W = size * S
-    fon = rounded(0, 0, W, W, W * 0.24)
+def folder(W):
     # папка: корпус и «язычок»
     body = rounded(W * 0.20, W * 0.36, W * 0.60, W * 0.40, W * 0.06)
     tab  = rounded(W * 0.20, W * 0.26, W * 0.30, W * 0.16, W * 0.05)
+    return lambda px, py: body(px, py) or tab(px, py)
+
+def check(W):
+    # галочка «уже сохранено»: ломаная толстой линией с круглыми концами
+    pts = [(W * 0.27, W * 0.53), (W * 0.43, W * 0.69), (W * 0.74, W * 0.36)]
+    half = W * 0.075
+    def near(px, py, a, b):
+        (ax, ay), (bx, by) = a, b
+        dx, dy = bx - ax, by - ay
+        t = max(0, min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)))
+        ex, ey = ax + t * dx - px, ay + t * dy - py
+        return ex * ex + ey * ey <= half * half
+    return lambda px, py: near(px, py, pts[0], pts[1]) or near(px, py, pts[1], pts[2])
+
+def render(size, glyph=folder):
+    W = size * S
+    fon = rounded(0, 0, W, W, W * 0.24)
+    mark = glyph(W)
     big = []
     for py in range(W):
         row = []
         for px in range(W):
             if not fon(px + .5, py + .5):
                 row.append(None)
-            elif body(px + .5, py + .5) or tab(px + .5, py + .5):
+            elif mark(px + .5, py + .5):
                 row.append(FG)
             else:
                 row.append(BG)
@@ -62,3 +78,8 @@ def png(rows, size, path):
 for n in (16, 32, 48, 128):
     png(render(n), n, 'icon%d.png' % n)
     print('icon%d.png' % n)
+
+# значок вкладки, которая уже лежит в картотеке — только для панели
+for n in (16, 32):
+    png(render(n, check), n, 'saved%d.png' % n)
+    print('saved%d.png' % n)

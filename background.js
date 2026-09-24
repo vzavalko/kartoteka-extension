@@ -36,7 +36,7 @@ async function deliver(items, folder, newFolder){
 }
 
 /* Дописываем сохранённое в свой снимок, не дожидаясь нового от страницы:
-   иначе точка на значке появится через полминуты, а попап ещё раз предложит
+   иначе галочка на значке появится через полминуты, а попап ещё раз предложит
    сохранить то, что только что сохранили. */
 async function noteSaved(list, folder){
   const snap = (await chrome.storage.local.get('snap')).snap;
@@ -90,24 +90,21 @@ chrome.commands.onCommand.addListener(async cmd => {
   else markTab(tab.id, tab.url);
 });
 
-/* ── точка на значке ──
-   Вкладка, которая уже лежит в картотеке, помечается точкой — чтобы не
-   открывать попап ради проверки. Метка у каждой вкладки своя (`tabId`), общий
-   текст значка под ней не виден, поэтому счётчик ожидающих ссылок важнее:
-   пока он есть, точки не ставим. */
-const DOT = '\u2022';
+/* ── галочка на значке ──
+   Вкладка, которая уже лежит в картотеке, получает свою иконку: тот же розовый
+   квадрат, но вместо папки галочка — чтобы не открывать попап ради проверки.
+   Иконка у каждой вкладки своя (`tabId`) и с текстом значка не спорит, так что
+   счётчик ожидающих ссылок виден поверх неё как обычно. */
+const ICON = { 16: 'icons/icon16.png', 32: 'icons/icon32.png' };
+const SAVED = { 16: 'icons/saved16.png', 32: 'icons/saved32.png' };
 
 async function markTab(tabId, url){
   if(!Number.isInteger(tabId)) return;
-  const store = await chrome.storage.local.get(['inbox', 'snap']);
-  if((store.inbox || []).length) return;             /* счётчик важнее точки */
-  const urls = (store.snap && store.snap.urls) || null;
+  const urls = ((await chrome.storage.local.get('snap')).snap || {}).urls || null;
   const known = !!urls && savable(url) &&
                 Object.prototype.hasOwnProperty.call(urls, normUrl(url));
-  try{
-    await chrome.action.setBadgeText({ tabId, text: known ? DOT : '' });
-    if(known) await chrome.action.setBadgeBackgroundColor({ tabId, color: '#9A9AA0' });
-  }catch(e){}   /* вкладка могла закрыться, пока мы ходили в хранилище */
+  try{ await chrome.action.setIcon({ tabId, path: known ? SAVED : ICON }); }
+  catch(e){}   /* вкладка могла закрыться, пока мы ходили в хранилище */
 }
 
 /* Активные вкладки всех окон: снимок поменялся — метки могли устареть. */
