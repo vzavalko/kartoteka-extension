@@ -1,6 +1,7 @@
 <!doctype html>
 <meta charset="utf-8">
 <title>ZAKLADKA</title>
+<script src="theme.js"></script>
 <style>
 :root{
   --ink:#0F0F0F; --paper:#fff; --surf:#F5F5F5; --surf-2:#ECECEC;
@@ -8,11 +9,13 @@
   --accent:#FA0CF7;
   color-scheme:light;
 }
-@media (prefers-color-scheme:dark){:root{
-  --ink:#F4F4F4; --paper:#131313; --surf:#1D1D1D; --surf-2:#262626;
-  --muted:rgba(255,255,255,.45); --line:rgba(255,255,255,.12); --line-2:rgba(255,255,255,.26);
+/* Тёмная — сине-серая, как в самой ZAKLADKA (в духе ночной темы Telegram).
+   Включается не системой, а выбором на странице: его приносит theme.js. */
+:root[data-theme="dark"]{
+  --ink:#E6ECF2; --paper:#17212B; --surf:#1F2B38; --surf-2:#283748;
+  --muted:#7A8DA1; --line:rgba(140,172,204,.12); --line-2:rgba(140,172,204,.26);
   color-scheme:dark;
-}}
+}
 *{box-sizing:border-box}
 /* .tab{display:flex} перебивал бы штатный [hidden] */
 [hidden]{display:none!important}
@@ -169,7 +172,7 @@ kbd{
     </div>
   </div>
   <div class="note"><kbd>⌘⇧S</kbd> — сохранить вкладку и закрыть её, <kbd>⌘⇧K</kbd> — открыть это окно.
-  Точка на значке значит, что страница уже в картотеке.</div>
+  Галочка на значке значит, что страница уже в картотеке.</div>
 </div>
 
 <script src="common.js"></script>

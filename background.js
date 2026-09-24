@@ -79,7 +79,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
   if(!msg || msg.type !== 'snapshot') return;
   chrome.storage.local.set({
-    snap: { at: Date.now(), folders: msg.folders || [], active: msg.at || null, urls: msg.urls || {} }
+    snap: { at: Date.now(), folders: msg.folders || [], active: msg.at || null, urls: msg.urls || {}, theme: msg.theme || 'light' }
   }).then(() => { markActive(); reply({ ok:true }); }, () => reply({ ok:false }));
   return true;
 });

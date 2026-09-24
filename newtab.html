@@ -1,17 +1,21 @@
 <!doctype html>
 <meta charset="utf-8">
 <title>ZAKLADKA</title>
+<script src="theme.js"></script>
 <style>
 :root{
   --ink:#0F0F0F; --paper:#fff; --surf:#F5F5F5; --muted:rgba(15,15,15,.42);
   --line:rgba(15,15,15,.10); --accent:#FA0CF7;
   color-scheme:light;
 }
-@media (prefers-color-scheme:dark){:root{
-  --ink:#F4F4F4; --paper:#0C0C0C; --surf:#1A1A1A; --muted:rgba(255,255,255,.45);
-  --line:rgba(255,255,255,.12);
+/* Тёмная — сине-серая, как в самой ZAKLADKA (в духе ночной темы Telegram).
+   Включается не системой, а выбором на странице: его приносит theme.js. */
+/* Фон — ровно фон страницы (#0E1621), чтобы пока фрейм грузится, не мигало. */
+:root[data-theme="dark"]{
+  --ink:#E6ECF2; --paper:#0E1621; --surf:#1F2B38; --muted:#7A8DA1;
+  --line:rgba(140,172,204,.12);
   color-scheme:dark;
-}}
+}
 html,body{height:100%}
 body{
   margin:0;background:var(--paper);color:var(--ink);

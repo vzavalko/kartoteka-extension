@@ -21,7 +21,7 @@ const ASKS = {
 
 /* Письма без ответа: страница просто рассказывает о себе. */
 const TELLS = {
-  snapshot: m => ({ type:'snapshot', folders:m.folders || [], at:m.at || null, urls:m.urls || {} })
+  snapshot: m => ({ type:'snapshot', folders:m.folders || [], at:m.at || null, urls:m.urls || {}, theme:m.theme === 'dark' ? 'dark' : 'light' })
 };
 
 window.addEventListener('message', async e => {
